@@ -9,6 +9,9 @@ import { Separator } from "@/components/ui/separator"
 import { Upload, Play, Pause, Trash2, GripVertical, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import {router} from "next/client";
+import {Router} from "next/router";
+import {useRouter} from "next/navigation";
 interface VideoFile {
   id: string
   name: string
@@ -40,6 +43,8 @@ export default function VideoSegmentEditor() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playlistVideoRef = useRef<HTMLVideoElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const router = useRouter()
 
   // Handle file upload
   const handleFileUpload = useCallback((files: FileList | null) => {
@@ -116,6 +121,8 @@ export default function VideoSegmentEditor() {
 
     const startTime = start
     const endTime = Math.min(end, selectedVideo.duration) // Default 10 second segment
+
+    if (endTime <= startTime) return
 
     const newSegment: Segment = {
       id: Math.random().toString(36).substr(2, 9),
@@ -211,6 +218,10 @@ export default function VideoSegmentEditor() {
   // @ts-ignore
   return (
     <div className="min-h-screen bg-gray-50 p-4">
+      <div className="flex justify-end gap-1 mb-4">
+        <Button onClick={()=>router.push("auth/signup")} variant={"outline"}>Sign Up</Button>
+        <Button onClick={() => router.push("/auth/login")}>Login</Button>
+      </div>
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Video Editor</h1>
