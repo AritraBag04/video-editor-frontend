@@ -28,6 +28,29 @@ interface Segment {
   name: string
 }
 
+interface VideoTimeline {
+  videoTrack: number,
+  start: number,
+  end: number
+}
+
+interface AudioTimeline {
+  audioTrack: number,
+  start: number,
+  end: number
+}
+
+interface RequestBody {
+  input: {
+    videoTracks: number,
+    audioTracks: number,
+  },
+  filterTimeLineRequest: {
+    videoTimeline: VideoTimeline[],
+    audioTimeline: AudioTimeline[]
+  }
+}
+
 export default function VideoSegmentEditor() {
   const [videos, setVideos] = useState<VideoFile[]>([])
   const [segments, setSegments] = useState<Segment[]>([])
@@ -210,9 +233,94 @@ export default function VideoSegmentEditor() {
     }
   }
 
+  const uploadToPresignedUrl = async (presignedUrl: string, file: File) => {
+    try {
+      const response = await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': 'video/mp4'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error uploading to S3:', error);
+      throw error;
+    }
+  };
+
+  const fileUploads = async (videoURL: string, presignedURL: string, videoName: string) => {
+    const response = await fetch(videoURL);
+    const blob = await response.blob();
+    const file = new File([blob], videoName, { type: 'video/mp4' });
+    return uploadToPresignedUrl(presignedURL, file);
+  }
+
+  const createBody = (indexMap: Map<string, number>, videoTracks: number, audioTracks: number, segments: Segment[]) => {
+    let body: RequestBody = {
+      input : {
+        videoTracks,
+        audioTracks
+      },
+      filterTimeLineRequest : {
+        videoTimeline: [],
+        audioTimeline: []
+      }
+    }
+    for(let i: number = 0; i < segments.length; i++) {
+      let videoTrack: any = indexMap.get(segments[i].videoId)
+      let startTime: number = segments[i].startTime
+      let endTime: number = segments[i].endTime
+      let segment: VideoTimeline = {
+        videoTrack,
+        start: startTime,
+        end: endTime
+      }
+      body.filterTimeLineRequest.videoTimeline.push(segment)
+    }
+    return body;
+  }
+
   const create_video = () => {
-    console.log("Playlist created");
-    console.log(segments);
+    // console.log("Playlist created");
+    // console.log(segments);
+    let videoTracks: number = videos.length;
+    fetch(`http://localhost:8088/api/v1/presigned-urls?userEmail=aritra&videoTracks=${videoTracks}&audioTracks=0`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5YWQ5YWRjMi01MmM2LTQzZTUtOGU0YS0yNGNjYzIzMDI2OTkiLCJpYXQiOjE3NTA2OTMxMzEsImV4cCI6MTc1MDc3OTUzMX0.EqD4i5Cwlu-BqK5zD6WbfW7wi6ZUy-WP3uLocF1hg_Y'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log(data);
+          const projectId = data.projectId;
+          const presignedUrls = data.preSignedURLs;
+          const indexMap: Map<string, number> = new Map();
+          for(let i: number = 0; i < videoTracks; i++) {
+            const video: VideoFile = videos[i];
+            const url: string = presignedUrls[i];
+            const videoName: string = "video"+i.toString()+".mp4";
+            indexMap.set(video.id, i);
+            fileUploads(video.url, url, videoName);
+          }
+          console.log(createBody(indexMap, videoTracks, 0, segments));
+          fetch('http//localhost:8088/api/v1/process',
+              {
+                method: 'Post',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5YWQ5YWRjMi01MmM2LTQzZTUtOGU0YS0yNGNjYzIzMDI2OTkiLCJpYXQiOjE3NTA2OTMxMzEsImV4cCI6MTc1MDc3OTUzMX0.EqD4i5Cwlu-BqK5zD6WbfW7wi6ZUy-WP3uLocF1hg_Y'
+                }
+              }).then(response => response.json())
+        })
   }
 
   // @ts-ignore
