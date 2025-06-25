@@ -239,7 +239,7 @@ export default function VideoSegmentEditor() {
   const pollForProjectStatus = async (requestId: string) => {
     while (true) {
       try {
-        const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/project?requestId=${requestId}`, {
+        const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/project?requestId=${requestId}`, {
           headers: {
             'Authorization': 'Bearer ' + Auth.getToken(),
           }
@@ -330,7 +330,7 @@ export default function VideoSegmentEditor() {
     // console.log(segments);
     const loadingToast = toast.loading("Creating video...");
     let videoTracks: number = videos.length;
-    fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
+    fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
         {
           method: 'GET',
           headers: {
@@ -353,7 +353,7 @@ export default function VideoSegmentEditor() {
                 .then()
           }
           let requestBody: RequestBody = createBody(projectId, indexMap, videoTracks, 0, segments)
-          fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/process`,
+          fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/process`,
               {
                 method: 'POST',
                 headers: {
