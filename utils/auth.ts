@@ -7,7 +7,7 @@ interface LoginResponse {
 export const Auth =  {
     handleLogin: async (email: string, password: string) => {
         try {
-            const response = await fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/auth/login`, {
+            const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -40,7 +40,7 @@ export const Auth =  {
             console.log("Signup called");
             console.log(email);
             console.log(password);
-            const response = await fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/auth/signup`, {
+            const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/auth/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

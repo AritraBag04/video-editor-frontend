@@ -49,7 +49,7 @@ export default function DownloadPage() {
                 className="mb-8 px-12 py-6 bg-black text-white text-xl font-semibold rounded-lg hover:bg-gray-800 transition-colors shadow-lg"
                 onClick={() => {
                     // Add your download logic here
-                    fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/project?requestId=${Auth.getRequestId()}`,
+                    fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/project?requestId=${Auth.getRequestId()}`,
                         {
                             headers: {
                             'Authorization': 'Bearer ' + Auth.getToken(),
