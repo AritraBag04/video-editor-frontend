@@ -7,6 +7,8 @@ import {Input} from "@/components/ui/input"
 import {Button} from "@/components/ui/button"
 import {Label} from "@/components/ui/label"
 import {Card, CardHeader, CardContent, CardFooter} from "@/components/ui/card"
+import {toast} from "sonner";
+import {Auth} from "@/utils/auth";
 
 export default function SignupPage() {
     const router = useRouter()
@@ -14,8 +16,20 @@ export default function SignupPage() {
     const [password, setPassword] = useState("")
 
     const handleSubmit = async (e: React.FormEvent) => {
+        console.log(process.env.NEXT_PUBLIC_BACKEND_IP)
         e.preventDefault()
         // Handle signup logic here
+        const loadingToast = toast.loading('Creating account...')
+
+        try{
+            const response = await Auth.handleSignup(email, password);
+            toast.dismiss(loadingToast)
+            toast.success('Successfully created an account! Please login to continue!')
+            router.push("/auth/login");
+        } catch(err){
+            toast.dismiss(loadingToast)
+            toast.error('Failed to sign up!')
+        }
     }
 
     return (

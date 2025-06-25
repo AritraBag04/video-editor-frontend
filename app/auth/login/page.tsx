@@ -7,6 +7,8 @@ import {Input} from "@/components/ui/input"
 import {Button} from "@/components/ui/button"
 import {Label} from "@/components/ui/label"
 import {Card, CardHeader, CardContent, CardFooter} from "@/components/ui/card"
+import {toast} from "sonner";
+import {Auth} from "@/utils/auth";
 
 export default function LoginPage() {
     const router = useRouter()
@@ -16,6 +18,17 @@ export default function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         // Handle login logic here
+        const loadingToast = toast.loading('Logging in...')
+
+        try{
+            const response = await Auth.handleLogin(email, password);
+            toast.dismiss(loadingToast)
+            toast.success('Successfully logged in!')
+            router.push("/");
+        } catch(err){
+            toast.dismiss(loadingToast)
+            toast.error('Login failed. Please check your credentials.')
+        }
     }
 
     return (

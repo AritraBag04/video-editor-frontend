@@ -9,9 +9,10 @@ import { Separator } from "@/components/ui/separator"
 import { Upload, Play, Pause, Trash2, GripVertical, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
-import {router} from "next/client";
-import {Router} from "next/router";
+import {Auth} from "@/utils/auth"
 import {useRouter} from "next/navigation";
+import {toast} from "sonner"
+import {UserAvatar} from "@/components/UserAvatar";
 interface VideoFile {
   id: string
   name: string
@@ -41,11 +42,13 @@ interface AudioTimeline {
 }
 
 interface RequestBody {
+  projectId: string,
+  emailId: string|any,
   input: {
     videoTracks: number,
     audioTracks: number,
   },
-  filterTimeLineRequest: {
+  filterTimelineRequest: {
     videoTimeline: VideoTimeline[],
     audioTimeline: AudioTimeline[]
   }
@@ -54,6 +57,7 @@ interface RequestBody {
 export default function VideoSegmentEditor() {
   const [videos, setVideos] = useState<VideoFile[]>([])
   const [segments, setSegments] = useState<Segment[]>([])
+  const [segmentId, setSegmentId] = useState<number>(segments.length)
   const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -147,13 +151,15 @@ export default function VideoSegmentEditor() {
 
     if (endTime <= startTime) return
 
+    setSegmentId(segmentId + 1)
+
     const newSegment: Segment = {
       id: Math.random().toString(36).substr(2, 9),
       videoId: selectedVideo.id,
       videoName: selectedVideo.name,
       startTime,
       endTime,
-      name: `Segment ${segments.length + 1}`,
+      name: `Segment ${segmentId}`,
     }
 
     setSegments((prev) => [...prev, newSegment])
@@ -214,11 +220,8 @@ export default function VideoSegmentEditor() {
           playlistVideoRef.current.pause()
           playlistVideoRef.current.removeEventListener("timeupdate", checkEndTime)
 
-          // Auto-play next segment after 1 second
-          setTimeout(() => {
-            setPlaylistIndex(index + 1)
-            playSegment(index + 1)
-          }, 1000)
+          setPlaylistIndex(index + 1)
+          playSegment(index + 1)
         }
       }
 
@@ -232,6 +235,36 @@ export default function VideoSegmentEditor() {
       playlistVideoRef.current.pause()
     }
   }
+
+  const pollForProjectStatus = async (requestId: string) => {
+    while (true) {
+      try {
+        const response = await fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/project?requestId=${requestId}`, {
+          headers: {
+            'Authorization': 'Bearer ' + Auth.getToken(),
+          }
+        });
+
+        if (response.status === 404) {
+          // Project is still processing, continue polling
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error('Project status check failed');
+        }
+
+        // Get the URL directly as text
+        const preSignedUrl = await response.text();
+        return { preSignedUrl }; // Return in the expected format
+
+      } catch (error) {
+        console.error('Error polling for project status:', error);
+        throw error;
+      }
+    }
+  };
 
   const uploadToPresignedUrl = async (presignedUrl: string, file: File) => {
     try {
@@ -258,16 +291,18 @@ export default function VideoSegmentEditor() {
     const response = await fetch(videoURL);
     const blob = await response.blob();
     const file = new File([blob], videoName, { type: 'video/mp4' });
-    return uploadToPresignedUrl(presignedURL, file);
+    await uploadToPresignedUrl(presignedURL, file);
   }
 
-  const createBody = (indexMap: Map<string, number>, videoTracks: number, audioTracks: number, segments: Segment[]) => {
+  const createBody = (projectId: string, indexMap: Map<string, number>, videoTracks: number, audioTracks: number, segments: Segment[]) => {
     let body: RequestBody = {
+      projectId: projectId,
+      userEmail: Auth.getUserEmail() as string,
       input : {
         videoTracks,
         audioTracks
       },
-      filterTimeLineRequest : {
+      filterTimelineRequest : {
         videoTimeline: [],
         audioTimeline: []
       }
@@ -277,25 +312,30 @@ export default function VideoSegmentEditor() {
       let startTime: number = segments[i].startTime
       let endTime: number = segments[i].endTime
       let segment: VideoTimeline = {
-        videoTrack,
+        videoTrack: videoTrack,
         start: startTime,
         end: endTime
       }
-      body.filterTimeLineRequest.videoTimeline.push(segment)
+      body.filterTimelineRequest.videoTimeline.push(segment)
     }
     return body;
   }
 
-  const create_video = () => {
+  const create_video = async () => {
+    if (!Auth.isAuthenticated()) {
+      toast.error("Please login to create video");
+      return;
+    }
     // console.log("Playlist created");
     // console.log(segments);
+    const loadingToast = toast.loading("Creating video...");
     let videoTracks: number = videos.length;
-    fetch(`http://localhost:8088/api/v1/presigned-urls?userEmail=aritra&videoTracks=${videoTracks}&audioTracks=0`,
+    fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
         {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            // 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5YWQ5YWRjMi01MmM2LTQzZTUtOGU0YS0yNGNjYzIzMDI2OTkiLCJpYXQiOjE3NTA2OTMxMzEsImV4cCI6MTc1MDc3OTUzMX0.EqD4i5Cwlu-BqK5zD6WbfW7wi6ZUy-WP3uLocF1hg_Y'
+            'Authorization': `Bearer ${Auth.getToken()}`
           }
         })
         .then(response => response.json())
@@ -304,22 +344,39 @@ export default function VideoSegmentEditor() {
           const projectId = data.projectId;
           const presignedUrls = data.preSignedURLs;
           const indexMap: Map<string, number> = new Map();
-          for(let i: number = 0; i < videoTracks; i++) {
+          for (let i: number = 0; i < videoTracks; i++) {
             const video: VideoFile = videos[i];
             const url: string = presignedUrls[i];
-            const videoName: string = "video"+i.toString()+".mp4";
+            const videoName: string = "video" + i.toString() + ".mp4";
             indexMap.set(video.id, i);
-            fileUploads(video.url, url, videoName);
+            fileUploads(video.url, url, videoName)
+                .then()
           }
-          console.log(createBody(indexMap, videoTracks, 0, segments));
-          fetch('http//localhost:8088/api/v1/process',
+          let requestBody: RequestBody = createBody(projectId, indexMap, videoTracks, 0, segments)
+          fetch(`http://${process.env.NEXT_PUBLIC_BACKEND_IP}:8088/api/v1/process`,
               {
-                method: 'Post',
+                method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI5YWQ5YWRjMi01MmM2LTQzZTUtOGU0YS0yNGNjYzIzMDI2OTkiLCJpYXQiOjE3NTA2OTMxMzEsImV4cCI6MTc1MDc3OTUzMX0.EqD4i5Cwlu-BqK5zD6WbfW7wi6ZUy-WP3uLocF1hg_Y'
-                }
+                  'Authorization': `Bearer ${Auth.getToken()}`
+                },
+                body: JSON.stringify(requestBody)
               }).then(response => response.json())
+              .then(data => {
+                console.log(data);
+                Auth.setRequestId(data.requestId);
+                try {
+                  pollForProjectStatus(data.requestId)
+                      .then(()=>{
+                          toast.dismiss(loadingToast);
+                          toast.success("Video created successfully");
+                          router.push("/download");
+                        })
+                } catch (error) {
+                  toast.dismiss(loadingToast);
+                  toast.error("Error creating video");
+                }
+              })
         })
   }
 
@@ -327,8 +384,18 @@ export default function VideoSegmentEditor() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="flex justify-end gap-1 mb-4">
-        <Button onClick={()=>router.push("auth/signup")} variant={"outline"}>Sign Up</Button>
-        <Button onClick={() => router.push("/auth/login")}>Login</Button>
+        {Auth.isAuthenticated() ? (
+            <UserAvatar />
+        ) : (
+            <>
+              <Button onClick={() => router.push("auth/signup")} variant="outline">
+                Sign Up
+              </Button>
+              <Button onClick={() => router.push("/auth/login")}>
+                Login
+              </Button>
+            </>
+        )}
       </div>
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="text-center">
