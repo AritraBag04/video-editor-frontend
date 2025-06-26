@@ -43,7 +43,7 @@ interface AudioTimeline {
 
 interface RequestBody {
   projectId: string,
-  emailId: string|any,
+  userEmail: string|any,
   input: {
     videoTracks: number,
     audioTracks: number,
@@ -237,7 +237,8 @@ export default function VideoSegmentEditor() {
   }
 
   const pollForProjectStatus = async (requestId: string) => {
-    while (true) {
+    let time = 0;
+    while (time < 6) {
       try {
         const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/project?requestId=${requestId}`, {
           headers: {
@@ -246,8 +247,9 @@ export default function VideoSegmentEditor() {
         });
 
         if (response.status === 404) {
-          // Project is still processing, continue polling
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Project is still processing, continue pollin
+          time++;
+          await new Promise(resolve => setTimeout(resolve, 5000));
           continue;
         }
 
@@ -264,6 +266,8 @@ export default function VideoSegmentEditor() {
         throw error;
       }
     }
+
+    throw new Error('Polling timed out after 30 seconds');
   };
 
   const uploadToPresignedUrl = async (presignedUrl: string, file: File) => {
