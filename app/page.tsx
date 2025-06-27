@@ -325,64 +325,59 @@ export default function VideoSegmentEditor() {
     return body;
   }
 
+
   const create_video = async () => {
     if (!Auth.isAuthenticated()) {
       toast.error("Please login to create video");
       return;
     }
-    // console.log("Playlist created");
-    // console.log(segments);
     const loadingToast = toast.loading("Creating video...");
     let videoTracks: number = videos.length;
-    fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Auth.getToken()}`
-          }
-        })
-        .then(response => response.json())
-        .then(data => {
-          console.log(data);
-          const projectId = data.projectId;
-          const presignedUrls = data.preSignedURLs;
-          const indexMap: Map<string, number> = new Map();
-          for (let i: number = 0; i < videoTracks; i++) {
-            const video: VideoFile = videos[i];
-            const url: string = presignedUrls[i];
-            const videoName: string = "video" + i.toString() + ".mp4";
-            indexMap.set(video.id, i);
-            fileUploads(video.url, url, videoName)
-                .then()
-          }
-          let requestBody: RequestBody = createBody(projectId, indexMap, videoTracks, 0, segments)
-          fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/process`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Auth.getToken()}`
-                },
-                body: JSON.stringify(requestBody)
-              }).then(response => response.json())
-              .then(data => {
-                console.log(data);
-                Auth.setRequestId(data.requestId);
-                try {
-                  pollForProjectStatus(data.requestId)
-                      .then(()=>{
-                          toast.dismiss(loadingToast);
-                          toast.success("Video created successfully");
-                          router.push("/download");
-                        })
-                } catch (error) {
-                  toast.dismiss(loadingToast);
-                  toast.error("Error creating video");
-                }
-              })
-        })
-  }
+    try {
+      const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Auth.getToken()}`
+            }
+          });
+      const data = await response.json();
+      const projectId = data.projectId;
+      const presignedUrls = data.preSignedURLs;
+      const indexMap: Map<string, number> = new Map();
+
+      for (let i: number = 0; i < videoTracks; i++) {
+        const video: VideoFile = videos[i];
+        const url: string = presignedUrls[i];
+        const videoName: string = "video" + i.toString() + ".mp4";
+        indexMap.set(video.id, i);
+        await fileUploads(video.url, url, videoName);
+      }
+
+      let requestBody: RequestBody = createBody(projectId, indexMap, videoTracks, 0, segments);
+      const processResponse = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/process`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Auth.getToken()}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+      const processData = await processResponse.json();
+      Auth.setRequestId(processData.requestId);
+
+      await pollForProjectStatus(processData.requestId);
+      toast.dismiss(loadingToast);
+      toast.success("Video created successfully");
+      router.push("/download");
+
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error("Error creating video: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
 
   // @ts-ignore
   return (
