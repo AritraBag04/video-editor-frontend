@@ -236,40 +236,6 @@ export default function VideoSegmentEditor() {
     }
   }
 
-  const pollForProjectStatus = async (requestId: string) => {
-    let time = 0;
-    while (time < 24) {
-      try {
-        const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/project?requestId=${requestId}`, {
-          headers: {
-            'Authorization': 'Bearer ' + Auth.getToken(),
-          }
-        });
-
-        if (response.status === 404) {
-          // Project is still processing, continue pollin
-          time++;
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          continue;
-        }
-
-        if (!response.ok) {
-          throw new Error('Project status check failed');
-        }
-
-        // Get the URL directly as text
-        const preSignedUrl = await response.text();
-        return { preSignedUrl }; // Return in the expected format
-
-      } catch (error) {
-        console.error('Error polling for project status:', error);
-        throw error;
-      }
-    }
-
-    throw new Error('Polling timed out after 30 seconds');
-  };
-
   const uploadToPresignedUrl = async (presignedUrl: string, file: File) => {
     try {
       const response = await fetch(presignedUrl, {
@@ -368,10 +334,9 @@ export default function VideoSegmentEditor() {
       const processData = await processResponse.json();
       Auth.setRequestId(processData.requestId);
 
-      await pollForProjectStatus(processData.requestId);
+      // await pollForProjectStatus(processData.requestId);
       toast.dismiss(loadingToast);
-      toast.success("Video created successfully");
-      router.push("/download");
+      router.push("/processing")
 
     } catch (error) {
       toast.dismiss(loadingToast);
