@@ -238,7 +238,7 @@ export default function VideoSegmentEditor() {
 
   const pollForProjectStatus = async (requestId: string) => {
     let time = 0;
-    while (time < 6) {
+    while (time < 24) {
       try {
         const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/project?requestId=${requestId}`, {
           headers: {
