@@ -331,7 +331,7 @@ export default function VideoSegmentEditor() {
       toast.error("Please login to create video");
       return;
     }
-    const loadingToast = toast.loading("Creating video...");
+    const loadingToast = toast.loading("Creating video... This might take a few minutes. Please don't refresh the page.");
     let videoTracks: number = videos.length;
     try {
       const response = await fetch(`https://${process.env.NEXT_PUBLIC_BACKEND_IP}/api/v1/presigned-urls?userEmail=${Auth.getUserEmail()}&videoTracks=${videoTracks}&audioTracks=0`,
