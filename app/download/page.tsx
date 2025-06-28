@@ -58,7 +58,7 @@ export default function DownloadPage() {
                             const preSignedUrl = response.text();
                             // Download object from presignedURL
                             preSignedUrl.then(preSignedUrl =>{
-                                downloadFromPresignedUrl(preSignedUrl, "output.mkv")
+                                downloadFromPresignedUrl(preSignedUrl, "output.mp4")
                                 .then()
                             })
 
