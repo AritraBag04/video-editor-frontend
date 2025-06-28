@@ -279,7 +279,7 @@ export default function ProcessingPage() {
                         <p className="text-sm text-blue-700 text-center">
                             {isComplete
                                 ? 'Redirecting to download page...'
-                                : 'You can safely close this tab. We\'ll email you when your video is ready!'
+                                : 'Please don\'t refresh or close this tab. Your video is being created.'
                             }
                         </p>
                     </div>
